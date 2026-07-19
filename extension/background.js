@@ -170,6 +170,7 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 // Debounce tabs updates to avoid spamming the websocket on multi-tab events
 let updateTimeout = null;
 async function sendTabsUpdate() {
+  connect();
   if (updateTimeout) clearTimeout(updateTimeout);
   updateTimeout = setTimeout(async () => {
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -192,6 +193,7 @@ chrome.tabs.onMoved.addListener(sendTabsUpdate);
 chrome.alarms.create("keepalive", { periodInMinutes: 0.33 }); 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "keepalive") {
+    console.log("Keepalive alarm fired at", new Date().toISOString(), "scheduledTime:", alarm.scheduledTime);
     // Also use this as a heartbeat to reconnect if needed
     connect();
   }

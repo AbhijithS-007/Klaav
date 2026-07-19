@@ -7,7 +7,7 @@ let selectedBrowser = null;
 let selectedIndex = -1;
 let groupByBrowser = false;
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
   const tabsViewEl = document.getElementById("tabs-view");
   const panelEl = document.getElementById("panel");
   const settingsTrigger = document.getElementById("settings-trigger");
@@ -17,6 +17,19 @@ window.addEventListener("DOMContentLoaded", () => {
 
   let currentTheme = "glass";
 
+  // Load persisted settings
+  try {
+    const settings = await invoke("load_settings");
+    groupByBrowser = settings.groupByBrowser;
+    currentTheme = settings.theme;
+    
+    groupBrowserCb.checked = groupByBrowser;
+    themeSelect.value = currentTheme;
+    document.documentElement.className = currentTheme === "glass" ? "" : currentTheme;
+  } catch (err) {
+    console.error("Failed to load settings:", err);
+  }
+
   // ---------------------------------------------------------------
   // Settings toggle
   // ---------------------------------------------------------------
@@ -24,8 +37,17 @@ window.addEventListener("DOMContentLoaded", () => {
     settingsPanel.classList.toggle("open");
   });
 
+  async function saveSettings() {
+    try {
+      await invoke("save_settings", { settings: { groupByBrowser, theme: currentTheme } });
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    }
+  }
+
   groupBrowserCb.addEventListener("change", (e) => {
     groupByBrowser = e.target.checked;
+    saveSettings();
     sortTabsData();
     renderTabs(true);
   });
@@ -33,6 +55,7 @@ window.addEventListener("DOMContentLoaded", () => {
   themeSelect.addEventListener("change", (e) => {
     currentTheme = e.target.value;
     document.documentElement.className = currentTheme === "glass" ? "" : currentTheme;
+    saveSettings();
   });
 
   // ---------------------------------------------------------------
@@ -107,6 +130,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // tabs-updated listener
   // ---------------------------------------------------------------
   listen("tabs-updated", (event) => {
+    document.getElementById("loading-state").style.display = "none";
     tabsData = event.payload || [];
 
     sortTabsData();

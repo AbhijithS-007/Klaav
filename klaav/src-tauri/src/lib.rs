@@ -1,5 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{Manager, Emitter, State};
 use tokio::sync::{mpsc, Mutex};
@@ -78,6 +80,52 @@ pub type AppState = Arc<Mutex<HashMap<String, BrowserState>>>;
 
 pub struct HotkeyState {
     pub is_pinned: std::sync::atomic::AtomicBool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Settings {
+    pub group_by_browser: bool,
+    pub theme: String,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            group_by_browser: false,
+            theme: "glass".to_string(),
+        }
+    }
+}
+
+fn get_settings_path(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
+    app_handle.path().app_data_dir().ok().map(|dir| dir.join("settings.json"))
+}
+
+#[tauri::command]
+fn load_settings(app_handle: tauri::AppHandle) -> Settings {
+    if let Some(path) = get_settings_path(&app_handle) {
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                if let Ok(settings) = serde_json::from_str(&content) {
+                    return settings;
+                }
+            }
+        }
+    }
+    Settings::default()
+}
+
+#[tauri::command]
+fn save_settings(app_handle: tauri::AppHandle, settings: Settings) -> Result<(), String> {
+    if let Some(path) = get_settings_path(&app_handle) {
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let content = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+        fs::write(path, content).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -371,7 +419,7 @@ pub fn run() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![greet, switch_tab, close_tab])
+        .invoke_handler(tauri::generate_handler![greet, switch_tab, close_tab, load_settings, save_settings])
         .setup(|app| {
             let app_state: AppState = Arc::new(Mutex::new(HashMap::new()));
             app.manage(app_state.clone());
