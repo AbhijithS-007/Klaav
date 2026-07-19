@@ -1,3 +1,185 @@
+/* --- THEME VARIABLES --- */
+:root {
+  --app-bg: transparent;
+
+  --panel-bg: rgba(20, 20, 25, 0.55);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-radius: 14px;
+  --panel-blur: blur(20px);
+  --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  
+  --chip-bg: rgba(10, 10, 15, 0.5);
+  --chip-border: rgba(255, 255, 255, 0.08);
+  --chip-radius: 10px;
+  --chip-shadow: none;
+  
+  --chip-hover-bg: rgba(255, 255, 255, 0.12);
+  --chip-hover-border: rgba(255, 255, 255, 0.15);
+  
+  --chip-sel-bg: rgba(255, 255, 255, 0.15);
+  --chip-sel-border: rgba(255, 255, 255, 0.3);
+  --chip-sel-shadow: none;
+  
+  --text-color: rgba(255, 255, 255, 0.9);
+  --sel-text-color: rgba(255, 255, 255, 0.9);
+  
+  --settings-color: rgba(255, 255, 255, 0.4);
+  --settings-hover-color: rgba(255, 255, 255, 0.9);
+  --settings-panel-bg: rgba(30, 30, 35, 0.85);
+  --settings-panel-border: rgba(255, 255, 255, 0.1);
+  --settings-panel-text: white;
+}
+
+/* 1. Neumorphism */
+.theme-neumorphism {
+  --panel-bg: #e0e5ec;
+  --panel-border: transparent;
+  --panel-radius: 16px;
+  --panel-blur: none;
+  
+  --chip-bg: #e0e5ec;
+  --chip-border: transparent;
+  --chip-radius: 12px;
+  --chip-shadow: 6px 6px 12px #b8bcc2, -6px -6px 12px #ffffff;
+  
+  --chip-hover-bg: #e0e5ec;
+  --chip-hover-border: transparent;
+  
+  --chip-sel-bg: #e0e5ec;
+  --chip-sel-border: transparent;
+  --chip-sel-shadow: inset 6px 6px 12px #b8bcc2, inset -6px -6px 12px #ffffff;
+  
+  --text-color: #4a4a52;
+  --sel-text-color: #4a4a52;
+  
+  --settings-color: #4a4a52;
+  --settings-hover-color: #222;
+  --settings-panel-bg: #e0e5ec;
+  --settings-panel-border: #b8bcc2;
+  --settings-panel-text: #4a4a52;
+}
+
+/* 2. Cyberpunk */
+.theme-cyberpunk {
+  --panel-bg: #000000;
+  --panel-border: #00ff00;
+  --panel-radius: 0px;
+  --panel-blur: none;
+  --font-family: 'Courier New', Courier, monospace;
+  
+  --chip-bg: #000000;
+  --chip-border: #004400;
+  --chip-radius: 0px;
+  --chip-shadow: none;
+  
+  --chip-hover-bg: #002200;
+  --chip-hover-border: #00ff00;
+  
+  --chip-sel-bg: #000000;
+  --chip-sel-border: #00ff00;
+  --chip-sel-shadow: 0 0 10px #00ff00;
+  
+  --text-color: #00ff00;
+  --sel-text-color: #00ff00;
+  
+  --settings-color: #00ff00;
+  --settings-hover-color: #ffffff;
+  --settings-panel-bg: #000000;
+  --settings-panel-border: #00ff00;
+  --settings-panel-text: #00ff00;
+}
+
+/* 3. E-Ink */
+.theme-eink {
+  --panel-bg: #ffffff;
+  --panel-border: #000000;
+  --panel-radius: 4px;
+  --panel-blur: none;
+  --font-family: Georgia, serif;
+  
+  --chip-bg: #ffffff;
+  --chip-border: transparent;
+  --chip-radius: 0px;
+  --chip-shadow: none;
+  
+  --chip-hover-bg: #eeeeee;
+  --chip-hover-border: transparent;
+  
+  --chip-sel-bg: #000000;
+  --chip-sel-border: #000000;
+  --chip-sel-shadow: none;
+  
+  --text-color: #000000;
+  --sel-text-color: #ffffff;
+  
+  --settings-color: #000000;
+  --settings-hover-color: #555555;
+  --settings-panel-bg: #ffffff;
+  --settings-panel-border: #000000;
+  --settings-panel-text: #000000;
+}
+
+/* 4. Aurora */
+.theme-aurora {
+  --app-bg: linear-gradient(135deg, rgba(74, 20, 140, 0.7), rgba(26, 35, 126, 0.7), rgba(136, 14, 79, 0.7));
+  --panel-bg: rgba(255, 255, 255, 0.1);
+  --panel-border: rgba(255, 255, 255, 0.2);
+  --panel-radius: 20px;
+  --panel-blur: blur(30px);
+  
+  --chip-bg: rgba(255, 255, 255, 0.1);
+  --chip-border: rgba(255, 255, 255, 0.2);
+  --chip-radius: 14px;
+  --chip-shadow: none;
+  
+  --chip-hover-bg: rgba(255, 255, 255, 0.2);
+  --chip-hover-border: rgba(255, 255, 255, 0.3);
+  
+  --chip-sel-bg: rgba(255, 255, 255, 0.3);
+  --chip-sel-border: rgba(255, 255, 255, 0.5);
+  --chip-sel-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  
+  --text-color: #ffffff;
+  --sel-text-color: #ffffff;
+  
+  --settings-color: rgba(255, 255, 255, 0.5);
+  --settings-hover-color: #ffffff;
+  --settings-panel-bg: rgba(255, 255, 255, 0.1);
+  --settings-panel-border: rgba(255, 255, 255, 0.2);
+  --settings-panel-text: #ffffff;
+}
+
+/* 5. Windows 95 */
+.theme-win95 {
+  --panel-bg: #c0c0c0;
+  --panel-border: #ffffff;
+  --panel-radius: 0px;
+  --panel-blur: none;
+  --font-family: 'MS Sans Serif', Tahoma, sans-serif;
+  
+  --chip-bg: #c0c0c0;
+  --chip-border: transparent;
+  --chip-radius: 0px;
+  --chip-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff, inset -2px -2px #dfdfdf;
+  
+  --chip-hover-bg: #c0c0c0;
+  --chip-hover-border: transparent;
+  
+  --chip-sel-bg: #c0c0c0;
+  --chip-sel-border: transparent;
+  --chip-sel-shadow: inset -1px -1px #ffffff, inset 1px 1px #0a0a0a, inset 2px 2px #dfdfdf;
+  
+  --text-color: #000000;
+  --sel-text-color: #000000;
+  
+  --settings-color: #000000;
+  --settings-hover-color: #333333;
+  --settings-panel-bg: #c0c0c0;
+  --settings-panel-border: #000000;
+  --settings-panel-text: #000000;
+}
+
+
 /* Base Reset */
 html, body {
   margin: 0;
@@ -6,7 +188,7 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: transparent;
-  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-family);
   user-select: none;
 }
 
@@ -14,7 +196,7 @@ html, body {
   position: relative;
   width: 100%;
   height: 100%;
-  background: transparent;
+  background: var(--app-bg);
 }
 
 #panel {
@@ -27,11 +209,11 @@ html, body {
   display: flex;
   flex-direction: column;
 
-  background: rgba(20, 20, 25, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
+  backdrop-filter: var(--panel-blur);
+  -webkit-backdrop-filter: var(--panel-blur);
 }
 
 /* --- TABS CAROUSEL CONTAINER --- */
@@ -59,9 +241,10 @@ html, body {
 .tab-chip {
   display: flex;
   align-items: center;
-  background: rgba(10, 10, 15, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  border-radius: var(--chip-radius);
+  box-shadow: var(--chip-shadow);
   padding: 4px 10px;
   height: 32px;
   box-sizing: border-box;
@@ -72,22 +255,21 @@ html, body {
   /* Carousel scaling and opacity transitions */
   transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), 
               opacity 220ms cubic-bezier(0.16, 1, 0.3, 1),
-              background 150ms, border-color 150ms;
+              background 150ms, border-color 150ms, box-shadow 150ms;
 }
 
 .tab-chip.selected {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: var(--chip-sel-bg);
+  border-color: var(--chip-sel-border);
+  box-shadow: var(--chip-sel-shadow);
+}
+.tab-chip.selected .tab-title {
+  color: var(--sel-text-color);
 }
 
 .tab-chip:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.tab-chip.active {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--chip-hover-bg);
+  border-color: var(--chip-hover-border);
 }
 
 .tab-dot {
@@ -106,7 +288,7 @@ html, body {
 .tab-dot.vivaldi { background: #EF3939; }
 
 .tab-title {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-color);
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -120,7 +302,7 @@ html, body {
   position: absolute;
   bottom: 12px;
   right: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--settings-color);
   cursor: pointer;
   transition: color 150ms;
   z-index: 50;
@@ -130,18 +312,18 @@ html, body {
 }
 
 #settings-trigger:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--settings-hover-color);
 }
 
 #settings-panel {
   position: absolute;
   bottom: 40px;
   right: 12px;
-  background: rgba(30, 30, 35, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--settings-panel-bg);
+  border: 1px solid var(--settings-panel-border);
   padding: 10px 14px;
   border-radius: 8px;
-  color: white;
+  color: var(--settings-panel-text);
   font-size: 13px;
   z-index: 50;
   backdrop-filter: blur(10px);

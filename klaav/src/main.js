@@ -13,6 +13,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const settingsTrigger = document.getElementById("settings-trigger");
   const settingsPanel = document.getElementById("settings-panel");
   const groupBrowserCb = document.getElementById("group-browser-cb");
+  const themeSelect = document.getElementById("theme-select");
+
+  let currentTheme = "glass";
 
   // ---------------------------------------------------------------
   // Settings toggle
@@ -25,6 +28,11 @@ window.addEventListener("DOMContentLoaded", () => {
     groupByBrowser = e.target.checked;
     sortTabsData();
     renderTabs(true);
+  });
+
+  themeSelect.addEventListener("change", (e) => {
+    currentTheme = e.target.value;
+    document.documentElement.className = currentTheme === "glass" ? "" : currentTheme;
   });
 
   // ---------------------------------------------------------------
