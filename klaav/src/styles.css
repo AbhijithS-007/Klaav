@@ -216,6 +216,62 @@ html, body {
   -webkit-backdrop-filter: var(--panel-blur);
 }
 
+/* --- PINNED TABS --- */
+#pinned-row {
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  gap: 12px;
+  padding: 12px 12px 0 12px;
+  min-height: 40px;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+#pinned-row::-webkit-scrollbar {
+  display: none;
+}
+
+.pinned-chip {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--chip-bg);
+  border: 1px solid var(--chip-border);
+  box-shadow: var(--chip-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  transition: opacity 200ms ease, transform 100ms ease;
+}
+
+.pinned-chip.offline {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.pinned-chip:not(.offline):hover {
+  transform: scale(1.1);
+}
+
+.pinned-chip img.favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  z-index: 2;
+}
+
+.pinned-chip .tab-dot {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  margin: 0; /* Override generic dot margins */
+  opacity: 0.8;
+}
+
 /* --- TABS CAROUSEL CONTAINER --- */
 #tabs-view-container {
   flex: 1;
@@ -251,6 +307,7 @@ html, body {
   cursor: pointer;
   flex-shrink: 0;
   width: 170px;
+  position: relative;
   
   /* Carousel scaling and opacity transitions */
   transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), 
@@ -267,9 +324,35 @@ html, body {
   color: var(--sel-text-color);
 }
 
-.tab-chip:hover {
+.tab-chip:not(.selected):hover {
   background: var(--chip-hover-bg);
   border-color: var(--chip-hover-border);
+}
+
+.tab-chip .pin-btn {
+  display: none;
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-color);
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.tab-chip:hover .pin-btn,
+.tab-chip .pin-btn.pinned {
+  display: block;
+}
+
+.tab-chip .pin-btn:hover {
+  opacity: 1;
+}
+
+.tab-chip .pin-btn svg {
+  width: 100%;
+  height: 100%;
 }
 
 .tab-dot {

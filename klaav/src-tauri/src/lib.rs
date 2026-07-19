@@ -87,6 +87,8 @@ pub struct HotkeyState {
 pub struct Settings {
     pub group_by_browser: bool,
     pub theme: String,
+    #[serde(default)]
+    pub pinned_urls: Vec<String>,
 }
 
 impl Default for Settings {
@@ -94,6 +96,7 @@ impl Default for Settings {
         Self {
             group_by_browser: false,
             theme: "glass".to_string(),
+            pinned_urls: Vec::new(),
         }
     }
 }

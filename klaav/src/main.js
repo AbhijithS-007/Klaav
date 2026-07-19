@@ -6,6 +6,7 @@ let selectedTabId = null;
 let selectedBrowser = null;
 let selectedIndex = -1;
 let groupByBrowser = false;
+let pinnedUrls = [];
 
 window.addEventListener("DOMContentLoaded", async () => {
   console.log("Loading state mounted/visible");
@@ -23,6 +24,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const settings = await invoke("load_settings");
     groupByBrowser = settings.groupByBrowser;
     currentTheme = settings.theme;
+    pinnedUrls = settings.pinnedUrls || [];
     
     groupBrowserCb.checked = groupByBrowser;
     themeSelect.value = currentTheme;
@@ -40,7 +42,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   async function saveSettings() {
     try {
-      await invoke("save_settings", { settings: { groupByBrowser, theme: currentTheme } });
+      await invoke("save_settings", { settings: { groupByBrowser, theme: currentTheme, pinnedUrls } });
     } catch (err) {
       console.error("Failed to save settings:", err);
     }
@@ -144,33 +146,79 @@ window.addEventListener("DOMContentLoaded", async () => {
       selectedIndex = -1;
       selectedTabId = null;
       selectedBrowser = null;
-      renderTabs(true);
-      return;
-    }
+    } else {
+      // Restore selection by ID/browser across re-renders
+      if (selectedTabId !== null && selectedBrowser !== null) {
+        const idx = tabsData.findIndex(
+          t => t.tab_id === selectedTabId && t.browser === selectedBrowser
+        );
+        if (idx !== -1) {
+          selectedIndex = idx;
+        } else {
+          selectedIndex = -1;
+          selectedTabId = null;
+          selectedBrowser = null;
+        }
+      }
 
-    // Restore selection by ID/browser across re-renders
-    if (selectedTabId !== null && selectedBrowser !== null) {
-      const idx = tabsData.findIndex(
-        t => t.tab_id === selectedTabId && t.browser === selectedBrowser
-      );
-      if (idx !== -1) {
-        selectedIndex = idx;
-      } else {
-        selectedIndex = -1;
-        selectedTabId = null;
-        selectedBrowser = null;
+      // Default to the currently-active browser tab if nothing selected
+      if (selectedIndex === -1) {
+        const activeIdx = tabsData.findIndex(t => t.active);
+        selectedIndex = activeIdx !== -1 ? activeIdx : 0;
+        updateSelectionState(selectedIndex);
       }
     }
 
-    // Default to the currently-active browser tab if nothing selected
-    if (selectedIndex === -1) {
-      const activeIdx = tabsData.findIndex(t => t.active);
-      selectedIndex = activeIdx !== -1 ? activeIdx : 0;
-      updateSelectionState(selectedIndex);
-    }
-
+    renderPinnedRow();
     renderTabs(true);
   });
+
+  // ---------------------------------------------------------------
+  // renderPinnedRow
+  // ---------------------------------------------------------------
+  function renderPinnedRow() {
+    const pinnedRowEl = document.getElementById("pinned-row");
+    if (!pinnedRowEl) return;
+    
+    pinnedRowEl.innerHTML = "";
+    
+    pinnedUrls.forEach(url => {
+      const chipEl = document.createElement("div");
+      
+      // Check if this URL is currently open
+      const liveTab = tabsData.find(t => t.url === url);
+      
+      chipEl.className = liveTab ? "pinned-chip" : "pinned-chip offline";
+      chipEl.title = liveTab ? (liveTab.title || url) : url;
+      
+      if (liveTab) {
+        const dotEl = document.createElement("div");
+        dotEl.className = `tab-dot ${liveTab.browser}`;
+        chipEl.appendChild(dotEl);
+        
+        chipEl.addEventListener("click", () => {
+          invoke("switch_tab", {
+            browser: liveTab.browser,
+            tabId: liveTab.tab_id,
+            windowId: liveTab.window_id
+          }).catch(err => console.error("Failed to switch tab:", err));
+        });
+      } else {
+        const imgEl = document.createElement("img");
+        imgEl.className = "favicon";
+        try {
+          const hostname = new URL(url).hostname;
+          imgEl.src = `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+        } catch(e) {
+          // If URL parsing fails, just use generic favicon
+          imgEl.src = `https://www.google.com/s2/favicons?domain=example.com&sz=32`;
+        }
+        chipEl.appendChild(imgEl);
+      }
+      
+      pinnedRowEl.appendChild(chipEl);
+    });
+  }
 
   // ---------------------------------------------------------------
   // renderTabs (Carousel Logic)
@@ -191,8 +239,33 @@ window.addEventListener("DOMContentLoaded", async () => {
         titleEl.className = "tab-title";
         titleEl.textContent = title || url || "Untitled Tab";
 
+        const pinBtn = document.createElement("div");
+        pinBtn.className = "pin-btn";
+        if (pinnedUrls.includes(url)) {
+          pinBtn.classList.add("pinned");
+          pinBtn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+        } else {
+          pinBtn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+        }
+
+        pinBtn.addEventListener("click", (e) => {
+          e.stopPropagation(); // prevent clicking the chip
+          if (pinnedUrls.includes(url)) {
+            pinnedUrls = pinnedUrls.filter(u => u !== url);
+            pinBtn.classList.remove("pinned");
+            pinBtn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+          } else {
+            pinnedUrls.push(url);
+            pinBtn.classList.add("pinned");
+            pinBtn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+          }
+          saveSettings();
+          renderPinnedRow();
+        });
+
         chipEl.appendChild(dotEl);
         chipEl.appendChild(titleEl);
+        chipEl.appendChild(pinBtn);
 
         chipEl.addEventListener("click", () => {
           updateSelectionState(i);
