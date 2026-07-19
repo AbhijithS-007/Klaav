@@ -76,13 +76,41 @@ pub struct BrowserState {
 
 pub type AppState = Arc<Mutex<HashMap<String, BrowserState>>>;
 
+pub struct HotkeyState {
+    pub is_pinned: std::sync::atomic::AtomicBool,
+}
+
 #[tauri::command]
-async fn switch_tab(browser: String, tab_id: u32, window_id: u32, state: State<'_, AppState>) -> Result<(), String> {
+async fn switch_tab(
+    browser: String, 
+    tab_id: u32, 
+    window_id: u32, 
+    state: State<'_, AppState>,
+    window: tauri::WebviewWindow,
+    hotkey_state: State<'_, HotkeyState>
+) -> Result<(), String> {
     let state_lock = state.lock().await;
     if let Some(browser_state) = state_lock.get(&browser) {
         let msg = serde_json::to_string(&ServerMessage::ActivateTab { tab_id, window_id })
             .map_err(|e| e.to_string())?;
+            
+        // Explicitly allow any process (i.e. the browser) to steal foreground focus from us.
+        // Without this, Windows prevents background processes from jumping to the front,
+        // causing the browser's taskbar icon to flash instead of actually opening.
+        #[cfg(windows)]
+        {
+            use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY};
+            unsafe {
+                let _ = AllowSetForegroundWindow(ASFW_ANY);
+            }
+        }
+
         let _ = browser_state.tx.send(msg).await;
+        
+        // Hide and unpin the window after a tab is selected
+        hotkey_state.is_pinned.store(false, std::sync::atomic::Ordering::Relaxed);
+        let _ = window.hide();
+        
         Ok(())
     } else {
         Err("Browser not found".into())
@@ -224,10 +252,22 @@ fn spawn_cursor_watcher(app_handle: tauri::AppHandle) {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
+            // Check if the window is currently pinned by a hotkey
+            let is_pinned = app_handle.try_state::<HotkeyState>()
+                .map(|s| s.is_pinned.load(Ordering::Relaxed))
+                .unwrap_or(false);
+
             let window = match app_handle.get_webview_window("main") {
                 Some(w) => w,
                 None => continue,
             };
+
+            // If pinned by the hotkey, we ensure our internal `is_visible` flag is synced
+            // and skip the auto-hide logic based on cursor completely.
+            if is_pinned {
+                is_visible.store(true, Ordering::Relaxed);
+                continue;
+            }
 
             let monitor = match window.primary_monitor() {
                 Ok(Some(m)) => m,
@@ -307,13 +347,25 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
-                    use tauri::{Manager, Emitter};
+                    use tauri::Manager;
                     use tauri_plugin_global_shortcut::ShortcutState;
                     if event.state == ShortcutState::Pressed {
-                        let _ = app.emit("hotkey-triggered", ());
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                        if let Some(state) = app.try_state::<HotkeyState>() {
+                            let currently_pinned = state.is_pinned.load(std::sync::atomic::Ordering::Relaxed);
+                            if currently_pinned {
+                                // Toggle off
+                                state.is_pinned.store(false, std::sync::atomic::Ordering::Relaxed);
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.hide();
+                                }
+                            } else {
+                                // Toggle on
+                                state.is_pinned.store(true, std::sync::atomic::Ordering::Relaxed);
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
                         }
                     }
                 })
@@ -323,13 +375,19 @@ pub fn run() {
         .setup(|app| {
             let app_state: AppState = Arc::new(Mutex::new(HashMap::new()));
             app.manage(app_state.clone());
+            
+            // Manage the hotkey state for toggling
+            app.manage(HotkeyState {
+                is_pinned: std::sync::atomic::AtomicBool::new(false),
+            });
+
             spawn_websocket_server(app.handle().clone(), app_state);
 
             use tauri::{menu::{Menu, MenuItem}, tray::TrayIconBuilder};
             use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
             
-            let ctrl_alt_space = "Ctrl+Alt+Space".parse::<Shortcut>().unwrap();
-            let _ = app.global_shortcut().register(ctrl_alt_space);
+            let alt_q = "Alt+Q".parse::<Shortcut>().unwrap();
+            let _ = app.global_shortcut().register(alt_q);
 
             let show_i = MenuItem::with_id(app, "show", "Show Klaav", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -341,6 +399,9 @@ pub fn run() {
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
+                        if let Some(state) = app.try_state::<HotkeyState>() {
+                            state.is_pinned.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();

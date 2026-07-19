@@ -120,7 +120,15 @@ function connect() {
       const msg = JSON.parse(event.data);
       if (msg.type === "activate-tab") {
         await chrome.tabs.update(msg.tab_id, { active: true });
-        await chrome.windows.update(msg.window_id, { focused: true });
+        
+        // If the window is minimized, setting focused: true won't bring it up on Windows.
+        // We must change its state to 'normal' or 'maximized' to actually show it.
+        const win = await chrome.windows.get(msg.window_id);
+        const updateParams = { focused: true };
+        if (win.state === "minimized") {
+          updateParams.state = "normal";
+        }
+        await chrome.windows.update(msg.window_id, updateParams);
       } else if (msg.type === "close-tab") {
         await chrome.tabs.remove(msg.tab_id);
       }
