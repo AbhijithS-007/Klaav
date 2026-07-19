@@ -433,6 +433,19 @@ pub fn run() {
                     // Start HIDDEN — the cursor watcher will show it when needed
                     let _ = window.hide();
                 }
+
+                let app_handle = app.handle().clone();
+                let window_clone = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(focused) = event {
+                        if !focused {
+                            if let Some(state) = app_handle.try_state::<HotkeyState>() {
+                                state.is_pinned.store(false, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            let _ = window_clone.hide();
+                        }
+                    }
+                });
             } else {
                 println!("Main window NOT found!");
             }
