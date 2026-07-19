@@ -8,6 +8,7 @@ let selectedIndex = -1;
 let groupByBrowser = false;
 
 window.addEventListener("DOMContentLoaded", async () => {
+  console.log("Loading state mounted/visible");
   const tabsViewEl = document.getElementById("tabs-view");
   const panelEl = document.getElementById("panel");
   const settingsTrigger = document.getElementById("settings-trigger");
@@ -130,7 +131,11 @@ window.addEventListener("DOMContentLoaded", async () => {
   // tabs-updated listener
   // ---------------------------------------------------------------
   listen("tabs-updated", (event) => {
-    document.getElementById("loading-state").style.display = "none";
+    const loader = document.getElementById("loading-state");
+    if (loader && loader.style.display !== "none") {
+      console.log("Loading state hidden (tabs arrived)");
+      loader.style.display = "none";
+    }
     tabsData = event.payload || [];
 
     sortTabsData();
