@@ -52,8 +52,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   groupBrowserCb.addEventListener("change", (e) => {
     groupByBrowser = e.target.checked;
     saveSettings();
-    sortTabsData();
-    renderTabs(true);
+    refreshTabList();
   });
 
   themeSelect.addEventListener("change", (e) => {
@@ -130,17 +129,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // ---------------------------------------------------------------
-  // tabs-updated listener
-  // ---------------------------------------------------------------
-  listen("tabs-updated", (event) => {
-    const loader = document.getElementById("loading-state");
-    if (loader && loader.style.display !== "none") {
-      console.log("Loading state hidden (tabs arrived)");
-      loader.style.display = "none";
-    }
-    tabsData = event.payload || [];
-
+  function refreshTabList() {
     sortTabsData();
 
     if (tabsData.length === 0) {
@@ -172,6 +161,19 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     renderPinnedRow();
     renderTabs(true);
+  }
+
+  // ---------------------------------------------------------------
+  // tabs-updated listener
+  // ---------------------------------------------------------------
+  listen("tabs-updated", (event) => {
+    const loader = document.getElementById("loading-state");
+    if (loader && loader.style.display !== "none") {
+      console.log("Loading state hidden (tabs arrived)");
+      loader.style.display = "none";
+    }
+    tabsData = event.payload || [];
+    refreshTabList();
   });
 
   // ---------------------------------------------------------------
