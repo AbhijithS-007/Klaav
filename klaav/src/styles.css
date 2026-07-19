@@ -2,7 +2,7 @@
 :root {
   --app-bg: transparent;
 
-  --panel-bg: rgba(20, 20, 25, 0.55);
+  --panel-bg: rgba(20, 20, 25, 0.25);
   --panel-border: rgba(255, 255, 255, 0.08);
   --panel-radius: 14px;
   --panel-blur: blur(20px);
@@ -318,7 +318,9 @@ html, body {
 #settings-panel {
   position: absolute;
   bottom: 40px;
+  left: 12px;
   right: 12px;
+  box-sizing: border-box;
   background: var(--settings-panel-bg);
   border: 1px solid var(--settings-panel-border);
   padding: 10px 14px;
