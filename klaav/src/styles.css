@@ -1,0 +1,172 @@
+/* Base Reset */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  user-select: none;
+}
+
+#app-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+}
+
+#panel {
+  box-sizing: border-box;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  background: rgba(20, 20, 25, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* --- TABS CAROUSEL CONTAINER --- */
+#tabs-view-container {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+#tabs-view {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  /* Translated vertically via JS so selected tab is at center */
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- TAB CHIPS --- */
+.tab-chip {
+  display: flex;
+  align-items: center;
+  background: rgba(10, 10, 15, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 4px 10px;
+  height: 32px;
+  box-sizing: border-box;
+  cursor: pointer;
+  flex-shrink: 0;
+  width: 170px;
+  
+  /* Carousel scaling and opacity transitions */
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), 
+              opacity 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              background 150ms, border-color 150ms;
+}
+
+.tab-chip.selected {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.tab-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.tab-chip.active {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.tab-dot.chrome { background: #4285F4; }
+.tab-dot.edge { background: #0078D7; }
+.tab-dot.brave { background: #FB542B; }
+.tab-dot.chromium { background: #7c7c7c; }
+.tab-dot.opera { background: #FF1B2D; }
+.tab-dot.vivaldi { background: #EF3939; }
+
+.tab-title {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* --- SETTINGS --- */
+#settings-trigger {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: color 150ms;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#settings-trigger:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+#settings-panel {
+  position: absolute;
+  bottom: 40px;
+  right: 12px;
+  background: rgba(30, 30, 35, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: white;
+  font-size: 13px;
+  z-index: 50;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#settings-panel.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+#settings-panel label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+#settings-panel input[type="checkbox"] {
+  accent-color: #4285F4;
+  cursor: pointer;
+}

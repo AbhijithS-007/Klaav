@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Klaav Extension",
+  "version": "1.0",
+  "description": "Connects browser tabs to the Klaav desktop app.",
+  "permissions": [
+    "tabs",
+    "alarms",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

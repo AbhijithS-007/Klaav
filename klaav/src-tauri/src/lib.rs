@@ -1,0 +1,386 @@
+// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use std::collections::HashMap;
+use std::sync::Arc;
+use tauri::{Manager, Emitter, State};
+use tokio::sync::{mpsc, Mutex};
+use futures_util::{StreamExt, SinkExt};
+use serde::{Deserialize, Serialize};
+use tokio::net::TcpListener;
+
+const SHARED_SECRET: &str = "my-secret-token";
+
+/* 
+ * WebSocket Message Protocol
+ *
+ * Client (Extension) -> Server (Tauri)
+ * 1. Hello Message (First message sent by client to authenticate)
+ *    {"type":"hello", "browser":"chrome", "token":"my-secret-token", "tabs": [{"tab_id": 1, "window_id": 2, "title": "...", "url": "...", "active": true}]}
+ *
+ * 2. Tabs Update Message (Sent by client whenever its tabs change)
+ *    {"type":"tabs-update", "tabs": [{"tab_id": 1, ...}]}
+ *
+ * Server (Tauri) -> Client (Extension)
+ * 1. Activate Tab
+ *    {"type":"activate-tab", "tab_id": 1, "window_id": 2}
+ *
+ * 2. Close Tab
+ *    {"type":"close-tab", "tab_id": 1, "window_id": 2}
+ */
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tab {
+    pub tab_id: u32,
+    pub window_id: u32,
+    pub title: String,
+    pub url: String,
+    pub active: bool,
+    #[serde(default)]
+    pub created_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TabWithBrowser {
+    pub browser: String,
+    #[serde(flatten)]
+    pub tab: Tab,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+pub enum ClientMessage {
+    #[serde(rename = "hello")]
+    Hello {
+        browser: String,
+        token: String,
+        tabs: Vec<Tab>,
+    },
+    #[serde(rename = "tabs-update")]
+    TabsUpdate {
+        tabs: Vec<Tab>,
+    },
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+pub enum ServerMessage {
+    #[serde(rename = "activate-tab")]
+    ActivateTab { tab_id: u32, window_id: u32 },
+    #[serde(rename = "close-tab")]
+    CloseTab { tab_id: u32, window_id: u32 },
+}
+
+pub struct BrowserState {
+    pub tx: mpsc::Sender<String>,
+    pub tabs: Vec<Tab>,
+}
+
+pub type AppState = Arc<Mutex<HashMap<String, BrowserState>>>;
+
+#[tauri::command]
+async fn switch_tab(browser: String, tab_id: u32, window_id: u32, state: State<'_, AppState>) -> Result<(), String> {
+    let state_lock = state.lock().await;
+    if let Some(browser_state) = state_lock.get(&browser) {
+        let msg = serde_json::to_string(&ServerMessage::ActivateTab { tab_id, window_id })
+            .map_err(|e| e.to_string())?;
+        let _ = browser_state.tx.send(msg).await;
+        Ok(())
+    } else {
+        Err("Browser not found".into())
+    }
+}
+
+#[tauri::command]
+async fn close_tab(browser: String, tab_id: u32, window_id: u32, state: State<'_, AppState>) -> Result<(), String> {
+    let state_lock = state.lock().await;
+    if let Some(browser_state) = state_lock.get(&browser) {
+        let msg = serde_json::to_string(&ServerMessage::CloseTab { tab_id, window_id })
+            .map_err(|e| e.to_string())?;
+        let _ = browser_state.tx.send(msg).await;
+        Ok(())
+    } else {
+        Err("Browser not found".into())
+    }
+}
+
+async fn broadcast_tabs(app_handle: &tauri::AppHandle, state: &AppState) {
+    let mut all_tabs = Vec::new();
+    {
+        let state_lock = state.lock().await;
+        println!("--- Current Aggregated Tabs ---");
+        for (browser, browser_state) in state_lock.iter() {
+            println!("Browser: {}", browser);
+            for tab in &browser_state.tabs {
+                println!("  - {}", tab.title);
+                all_tabs.push(TabWithBrowser {
+                    browser: browser.clone(),
+                    tab: tab.clone(),
+                });
+            }
+        }
+        println!("-------------------------------");
+    }
+    let _ = app_handle.emit("tabs-updated", all_tabs);
+}
+
+fn spawn_websocket_server(app_handle: tauri::AppHandle, state: AppState) {
+    tauri::async_runtime::spawn(async move {
+        let addr = "127.0.0.1:8765";
+        let listener = match TcpListener::bind(addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!("Failed to bind WebSocket server: {}", e);
+                return;
+            }
+        };
+        println!("WebSocket server listening on ws://{}", addr);
+
+        while let Ok((stream, _)) = listener.accept().await {
+            let app_handle = app_handle.clone();
+            let state = state.clone();
+            tauri::async_runtime::spawn(async move {
+                let ws_stream = match tokio_tungstenite::accept_async(stream).await {
+                    Ok(ws) => ws,
+                    Err(e) => {
+                        eprintln!("Error during WebSocket handshake: {}", e);
+                        return;
+                    }
+                };
+                
+                let (mut write, mut read) = ws_stream.split();
+                let mut browser_id: Option<String> = None;
+                
+                // Read the hello message
+                if let Some(Ok(msg)) = read.next().await {
+                    if let Ok(text) = msg.to_text() {
+                        if let Ok(ClientMessage::Hello { browser, token, tabs }) = serde_json::from_str(text) {
+                            if token != SHARED_SECRET {
+                                eprintln!("Invalid token from browser: {}", browser);
+                                return;
+                            }
+                            
+                            println!("New connection from browser: {}", browser);
+                            
+                            browser_id = Some(browser.clone());
+                            let (tx, mut rx) = mpsc::channel::<String>(32);
+                            
+                            {
+                                let mut state_lock = state.lock().await;
+                                state_lock.insert(browser.clone(), BrowserState { tx, tabs });
+                            }
+                            
+                            broadcast_tabs(&app_handle, &state).await;
+                            
+                            // Spawn a task to send messages from tx channel to the websocket
+                            tauri::async_runtime::spawn(async move {
+                                while let Some(msg) = rx.recv().await {
+                                    if write.send(tokio_tungstenite::tungstenite::Message::Text(msg.into())).await.is_err() {
+                                        break;
+                                    }
+                                }
+                            });
+                        } else {
+                            eprintln!("Expected Hello message");
+                            return;
+                        }
+                    }
+                }
+                
+                if let Some(browser) = browser_id {
+                    // Handle incoming messages
+                    while let Some(Ok(msg)) = read.next().await {
+                        if let Ok(text) = msg.to_text() {
+                            if let Ok(ClientMessage::TabsUpdate { tabs }) = serde_json::from_str(text) {
+                                {
+                                    let mut state_lock = state.lock().await;
+                                    if let Some(browser_state) = state_lock.get_mut(&browser) {
+                                        browser_state.tabs = tabs;
+                                    }
+                                }
+                                broadcast_tabs(&app_handle, &state).await;
+                            }
+                        }
+                    }
+                    
+                    // Connection closed, remove browser state
+                    {
+                        let mut state_lock = state.lock().await;
+                        state_lock.remove(&browser);
+                    }
+                    broadcast_tabs(&app_handle, &state).await;
+                }
+            });
+        }
+    });
+}
+
+/// Polls the OS cursor position every 50ms and shows/hides the window
+/// based on whether the cursor is in the left-edge trigger zone or
+/// within the panel's own bounds.
+fn spawn_cursor_watcher(app_handle: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let is_visible = Arc::new(AtomicBool::new(false));
+
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
+            let window = match app_handle.get_webview_window("main") {
+                Some(w) => w,
+                None => continue,
+            };
+
+            let monitor = match window.primary_monitor() {
+                Ok(Some(m)) => m,
+                _ => continue,
+            };
+
+            // Get the cursor position via Win32 GetCursorPos
+            let cursor_pos = {
+                #[cfg(windows)]
+                {
+                    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+                    use windows::Win32::Foundation::POINT;
+                    let mut pt = POINT { x: 0, y: 0 };
+                    let ok = unsafe { GetCursorPos(&mut pt) };
+                    if ok.is_ok() {
+                        Some((pt.x, pt.y))
+                    } else {
+                        None
+                    }
+                }
+                #[cfg(not(windows))]
+                {
+                    None::<(i32, i32)>
+                }
+            };
+
+            let (cx, cy) = match cursor_pos {
+                Some(p) => p,
+                None => continue,
+            };
+
+            // Calculate the panel's physical bounds on screen
+            let scale = monitor.scale_factor();
+            let panel_phys_w = (234.0 * scale) as i32;
+            let panel_phys_h = (monitor.size().height as f64 * 0.6) as i32;
+            let panel_x = monitor.position().x;
+            let panel_y = monitor.position().y + ((monitor.size().height as i32 - panel_phys_h) / 2);
+
+            // Trigger zone: within 10 physical pixels of the left edge, and
+            // within the panel's vertical band
+            let trigger_margin = (10.0 * scale) as i32;
+            let in_trigger_zone = cx >= panel_x
+                && cx <= panel_x + trigger_margin
+                && cy >= panel_y
+                && cy <= panel_y + panel_phys_h;
+
+            // Panel bounds: cursor is within the full panel rectangle
+            let in_panel_bounds = cx >= panel_x
+                && cx <= panel_x + panel_phys_w
+                && cy >= panel_y
+                && cy <= panel_y + panel_phys_h;
+
+            let currently_visible = is_visible.load(Ordering::Relaxed);
+
+            if !currently_visible && in_trigger_zone {
+                // Show the window
+                let _ = window.show();
+                let _ = window.set_focus();
+                is_visible.store(true, Ordering::Relaxed);
+            } else if currently_visible && !in_trigger_zone && !in_panel_bounds {
+                // Cursor left both the trigger zone and the panel area — hide
+                let _ = window.hide();
+                is_visible.store(false, Ordering::Relaxed);
+            }
+        }
+    });
+}
+
+#[tauri::command]
+fn greet(name: &str) -> String {
+    format!("Hello, {}! You've been greeted from Rust!", name)
+}
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    use tauri::{Manager, Emitter};
+                    use tauri_plugin_global_shortcut::ShortcutState;
+                    if event.state == ShortcutState::Pressed {
+                        let _ = app.emit("hotkey-triggered", ());
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(),
+        )
+        .invoke_handler(tauri::generate_handler![greet, switch_tab, close_tab])
+        .setup(|app| {
+            let app_state: AppState = Arc::new(Mutex::new(HashMap::new()));
+            app.manage(app_state.clone());
+            spawn_websocket_server(app.handle().clone(), app_state);
+
+            use tauri::{menu::{Menu, MenuItem}, tray::TrayIconBuilder};
+            use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+            
+            let ctrl_alt_space = "Ctrl+Alt+Space".parse::<Shortcut>().unwrap();
+            let _ = app.global_shortcut().register(ctrl_alt_space);
+
+            let show_i = MenuItem::with_id(app, "show", "Show Klaav", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .menu(&menu)
+                .show_menu_on_left_click(true)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        std::process::exit(0);
+                    }
+                    _ => {}
+                })
+                .build(app)?;
+
+            if let Some(window) = app.get_webview_window("main") {
+                println!("Main window found!");
+                println!("is_decorated: {:?}", window.is_decorated());
+                println!("outer_size: {:?}", window.outer_size());
+                println!("outer_position: {:?}", window.outer_position());
+
+                if let Ok(Some(monitor)) = window.primary_monitor() {
+                    let scale_factor = monitor.scale_factor();
+                    let physical_width = (234.0 * scale_factor) as u32;
+                    let physical_height = (monitor.size().height as f64 * 0.6) as u32;
+                    
+                    let y = monitor.position().y + ((monitor.size().height - physical_height) as i32 / 2);
+                    let x = monitor.position().x;
+                    
+                    let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize { width: physical_width, height: physical_height }));
+                    let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
+                    // Start HIDDEN — the cursor watcher will show it when needed
+                    let _ = window.hide();
+                }
+            } else {
+                println!("Main window NOT found!");
+            }
+
+            // Spawn the cursor-based show/hide watcher
+            spawn_cursor_watcher(app.handle().clone());
+
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
