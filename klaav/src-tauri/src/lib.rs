@@ -110,32 +110,6 @@ fn report_settings_open(state: tauri::State<UIState>, is_open: bool) {
     state.settings_open.store(is_open, std::sync::atomic::Ordering::Relaxed);
 }
 
-#[tauri::command]
-fn update_window_height(app_handle: tauri::AppHandle, tab_count: usize) {
-    if let Some(window) = app_handle.get_webview_window("main") {
-        if let Ok(Some(monitor)) = window.primary_monitor() {
-            let scale = monitor.scale_factor();
-            let base_padding = 90.0;
-            let tab_height = 40.0;
-            
-            let mut logical_height = base_padding + (tab_count as f64 * tab_height);
-            let max_logical_height = monitor.size().height as f64 / scale * 0.6;
-            
-            if logical_height < 250.0 { logical_height = 250.0; }
-            if logical_height > max_logical_height { logical_height = max_logical_height; }
-            
-            let physical_height = (logical_height * scale) as i32;
-            let current_size = window.outer_size().unwrap_or_default();
-            let _ = window.set_size(tauri::PhysicalSize::new(current_size.width, physical_height as u32));
-            
-            // Re-center vertically
-            let y = monitor.position().y + ((monitor.size().height as i32 - physical_height) / 2);
-            let current_pos = window.outer_position().unwrap_or_default();
-            let _ = window.set_position(tauri::PhysicalPosition::new(current_pos.x, y));
-        }
-    }
-}
-
 fn get_settings_path(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     app_handle.path().app_data_dir().ok().map(|dir| dir.join("settings.json"))
 }
@@ -387,7 +361,7 @@ fn spawn_cursor_watcher(app_handle: tauri::AppHandle) {
 
             let scale = monitor.scale_factor();
             let panel_phys_w = (234.0 * scale) as i32;
-            let panel_phys_h = window.outer_size().unwrap_or_default().height as i32;
+            let panel_phys_h = (monitor.size().height as f64 * 0.6) as i32;
             
             let panel_x = monitor.position().x;
             let panel_y = monitor.position().y + ((monitor.size().height as i32 - panel_phys_h) / 2);
@@ -474,7 +448,7 @@ pub fn run() {
                                     if let Ok(Some(monitor)) = window.primary_monitor() {
                                         let scale = monitor.scale_factor();
                                         let panel_phys_w = (234.0 * scale) as i32;
-                                        let panel_phys_h = window.outer_size().unwrap_or_default().height as i32;
+                                        let panel_phys_h = (monitor.size().height as f64 * 0.6) as i32;
                                         let panel_x = monitor.position().x;
                                         let panel_y = monitor.position().y + ((monitor.size().height as i32 - panel_phys_h) / 2);
 
@@ -502,7 +476,7 @@ pub fn run() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![greet, switch_tab, close_tab, load_settings, save_settings, report_settings_open, update_window_height])
+        .invoke_handler(tauri::generate_handler![greet, switch_tab, close_tab, load_settings, save_settings, report_settings_open])
         .setup(|app| {
             let app_state: AppState = Arc::new(Mutex::new(HashMap::new()));
             app.manage(app_state.clone());

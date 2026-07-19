@@ -172,8 +172,6 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     renderPinnedRow();
     renderTabs(true);
-    
-    invoke("update_window_height", { tabCount: tabsData.length }).catch(e => console.error(e));
   });
 
   // ---------------------------------------------------------------
@@ -268,7 +266,6 @@ window.addEventListener("DOMContentLoaded", async () => {
           }
           saveSettings();
           renderPinnedRow();
-          invoke("update_window_height", { tabCount: tabsData.length }).catch(e => console.error(e));
         });
 
         chipEl.appendChild(dotEl);
