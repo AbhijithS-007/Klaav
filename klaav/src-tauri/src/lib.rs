@@ -433,10 +433,13 @@ pub fn run() {
                     use tauri::Manager;
                     use tauri_plugin_global_shortcut::ShortcutState;
                     if event.state == ShortcutState::Pressed {
-                        let shortcut_str = format!("{:?}", _shortcut);
+                        use std::str::FromStr;
+                        let alt_q = tauri_plugin_global_shortcut::Shortcut::from_str("Alt+Q").unwrap();
+                        let nav_prev = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Alt+ArrowUp").unwrap();
+                        let nav_next = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Alt+ArrowDown").unwrap();
                         
                         // Handle Alt+Q (Toggle Panel)
-                        if shortcut_str.contains("Alt") && shortcut_str.contains("Q") {
+                        if _shortcut.id() == alt_q.id() {
                             if let Some(state) = app.try_state::<HotkeyState>() {
                                 let currently_pinned = state.is_pinned.load(std::sync::atomic::Ordering::Relaxed);
                                 if currently_pinned {
@@ -476,16 +479,17 @@ pub fn run() {
                             }
                         } 
                         // Handle Ctrl+Alt+Up and Ctrl+Alt+Down
-                        else if shortcut_str.contains("Ctrl") && shortcut_str.contains("Alt") && shortcut_str.contains("Up") {
+                        else if _shortcut.id() == nav_prev.id() {
                             let _ = app.emit("hotkey-nav-prev", ());
                         }
-                        else if shortcut_str.contains("Ctrl") && shortcut_str.contains("Alt") && shortcut_str.contains("Down") {
+                        else if _shortcut.id() == nav_next.id() {
                             let _ = app.emit("hotkey-nav-next", ());
                         }
                         // Handle Alt+1 through Alt+9 (Pinned Tab switching)
                         else {
                             for i in 1..=9 {
-                                if shortcut_str.contains("Alt") && shortcut_str.contains(&i.to_string()) {
+                                if let Ok(s) = tauri_plugin_global_shortcut::Shortcut::from_str(&format!("Alt+{}", i)) {
+                                    if _shortcut.id() == s.id() {
                                     let idx = i - 1;
                                     let app_handle = app.clone();
                                     
@@ -574,6 +578,7 @@ pub fn run() {
                                         }
                                     });
                                     break;
+                                    }
                                 }
                             }
                         }
@@ -600,21 +605,26 @@ pub fn run() {
             use tauri::{menu::{Menu, MenuItem}, tray::TrayIconBuilder};
             use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
             
-            let alt_q = "Alt+Q".parse::<Shortcut>().unwrap();
-            let _ = app.global_shortcut().register(alt_q);
-
-            for i in 1..=9 {
-                if let Ok(shortcut) = format!("Alt+{}", i).parse::<Shortcut>() {
-                    let _ = app.global_shortcut().register(shortcut);
+            let parse_and_register = |app: &tauri::App, name: &str| {
+                match name.parse::<Shortcut>() {
+                    Ok(shortcut) => {
+                        match app.global_shortcut().register(shortcut) {
+                            Ok(_) => println!("✅ Successfully registered shortcut: {}", name),
+                            Err(e) => println!("❌ Failed to register shortcut {}: {:?}", name, e),
+                        }
+                    }
+                    Err(e) => println!("❌ Failed to parse shortcut string {}: {:?}", name, e),
                 }
+            };
+
+            parse_and_register(app, "Alt+Q");
+            
+            for i in 1..=9 {
+                parse_and_register(app, &format!("Alt+{}", i));
             }
 
-            if let Ok(shortcut) = "Ctrl+Alt+Up".parse::<Shortcut>() {
-                let _ = app.global_shortcut().register(shortcut);
-            }
-            if let Ok(shortcut) = "Ctrl+Alt+Down".parse::<Shortcut>() {
-                let _ = app.global_shortcut().register(shortcut);
-            }
+            parse_and_register(app, "Ctrl+Alt+ArrowUp");
+            parse_and_register(app, "Ctrl+Alt+ArrowDown");
 
             let show_i = MenuItem::with_id(app, "show", "Show Klaav", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
