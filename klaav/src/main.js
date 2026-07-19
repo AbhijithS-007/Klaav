@@ -122,10 +122,10 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (groupByBrowser) {
       tabsData.sort((a, b) => {
         if (a.browser !== b.browser) return a.browser.localeCompare(b.browser);
-        return (a.created_at || 0) - (b.created_at || 0);
+        return (a.original_index || 0) - (b.original_index || 0);
       });
     } else {
-      tabsData.sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+      tabsData.sort((a, b) => (a.original_index || 0) - (b.original_index || 0));
     }
   }
 
@@ -173,6 +173,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       loader.style.display = "none";
     }
     tabsData = event.payload || [];
+    tabsData.forEach((t, i) => { t.original_index = i; });
     refreshTabList();
   });
 
