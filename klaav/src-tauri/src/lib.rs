@@ -365,21 +365,23 @@ fn spawn_cursor_watcher(app_handle: tauri::AppHandle) {
                 && cy >= panel_y
                 && cy <= panel_y + panel_phys_h;
 
-            // Panel bounds: cursor is within the full panel rectangle
-            let in_panel_bounds = cx >= panel_x
-                && cx <= panel_x + panel_phys_w
-                && cy >= panel_y
-                && cy <= panel_y + panel_phys_h;
+            // Hysteresis bound: adding a buffer of ~50 physical pixels to the hide bounds
+            let buffer = (50.0 * scale) as i32;
+            let in_hysteresis_bounds = cx >= panel_x - buffer
+                && cx <= panel_x + panel_phys_w + buffer
+                && cy >= panel_y - buffer
+                && cy <= panel_y + panel_phys_h + buffer;
 
             let currently_visible = is_visible.load(Ordering::Relaxed);
 
             if !currently_visible && in_trigger_zone {
                 // Show the window
+                let _ = window.emit("panel-shown", ());
                 let _ = window.show();
                 let _ = window.set_focus();
                 is_visible.store(true, Ordering::Relaxed);
-            } else if currently_visible && !in_trigger_zone && !in_panel_bounds {
-                // Cursor left both the trigger zone and the panel area — hide
+            } else if currently_visible && !in_trigger_zone && !in_hysteresis_bounds {
+                // Cursor left both the trigger zone and the hysteresis buffer — hide
                 let _ = window.hide();
                 is_visible.store(false, Ordering::Relaxed);
             }
@@ -413,6 +415,7 @@ pub fn run() {
                                 // Toggle on
                                 state.is_pinned.store(true, std::sync::atomic::Ordering::Relaxed);
                                 if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.emit("panel-shown", ());
                                     let _ = window.show();
                                     let _ = window.set_focus();
                                 }

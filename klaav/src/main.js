@@ -132,6 +132,21 @@ window.addEventListener("DOMContentLoaded", async () => {
   // ---------------------------------------------------------------
   // tabs-updated listener
   // ---------------------------------------------------------------
+  listen("panel-shown", () => {
+    // Reset transform out of view instantly, then trigger transition
+    panelEl.style.transition = "none";
+    panelEl.style.transform = "translateX(-100%)";
+    panelEl.style.opacity = "0";
+    
+    // Force a reflow
+    void panelEl.offsetWidth;
+    
+    // Animate in
+    panelEl.style.transition = "transform 220ms cubic-bezier(0.16,1,0.3,1), opacity 220ms ease-out";
+    panelEl.style.transform = "translateX(0)";
+    panelEl.style.opacity = "1";
+  });
+
   listen("tabs-updated", (event) => {
     const loader = document.getElementById("loading-state");
     if (loader && loader.style.display !== "none") {
@@ -241,11 +256,15 @@ window.addEventListener("DOMContentLoaded", async () => {
 
         const pinBtn = document.createElement("div");
         pinBtn.className = "pin-btn";
+        
+        const iconUnpinned = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.68V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v4.68a2 2 0 0 1-1.11 1.87l-1.78.89A2 2 0 0 0 5 15.24Z"></path></svg>`;
+        const iconPinned = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="currentColor" stroke-linecap="round" stroke-linejoin="round" style="transform: rotate(45deg);"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.68V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v4.68a2 2 0 0 1-1.11 1.87l-1.78.89A2 2 0 0 0 5 15.24Z"></path></svg>`;
+
         if (pinnedUrls.includes(url)) {
           pinBtn.classList.add("pinned");
-          pinBtn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+          pinBtn.innerHTML = iconPinned;
         } else {
-          pinBtn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+          pinBtn.innerHTML = iconUnpinned;
         }
 
         pinBtn.addEventListener("click", (e) => {
@@ -253,11 +272,11 @@ window.addEventListener("DOMContentLoaded", async () => {
           if (pinnedUrls.includes(url)) {
             pinnedUrls = pinnedUrls.filter(u => u !== url);
             pinBtn.classList.remove("pinned");
-            pinBtn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+            pinBtn.innerHTML = iconUnpinned;
           } else {
             pinnedUrls.push(url);
             pinBtn.classList.add("pinned");
-            pinBtn.innerHTML = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`;
+            pinBtn.innerHTML = iconPinned;
           }
           saveSettings();
           renderPinnedRow();
