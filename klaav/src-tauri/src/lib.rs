@@ -101,6 +101,41 @@ impl Default for Settings {
     }
 }
 
+pub struct UIState {
+    pub settings_open: std::sync::atomic::AtomicBool,
+}
+
+#[tauri::command]
+fn report_settings_open(state: tauri::State<UIState>, is_open: bool) {
+    state.settings_open.store(is_open, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[tauri::command]
+fn update_window_height(app_handle: tauri::AppHandle, tab_count: usize) {
+    if let Some(window) = app_handle.get_webview_window("main") {
+        if let Ok(Some(monitor)) = window.primary_monitor() {
+            let scale = monitor.scale_factor();
+            let base_padding = 90.0;
+            let tab_height = 40.0;
+            
+            let mut logical_height = base_padding + (tab_count as f64 * tab_height);
+            let max_logical_height = monitor.size().height as f64 / scale * 0.6;
+            
+            if logical_height < 250.0 { logical_height = 250.0; }
+            if logical_height > max_logical_height { logical_height = max_logical_height; }
+            
+            let physical_height = (logical_height * scale) as i32;
+            let current_size = window.outer_size().unwrap_or_default();
+            let _ = window.set_size(tauri::PhysicalSize::new(current_size.width, physical_height as u32));
+            
+            // Re-center vertically
+            let y = monitor.position().y + ((monitor.size().height as i32 - physical_height) / 2);
+            let current_pos = window.outer_position().unwrap_or_default();
+            let _ = window.set_position(tauri::PhysicalPosition::new(current_pos.x, y));
+        }
+    }
+}
+
 fn get_settings_path(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
     app_handle.path().app_data_dir().ok().map(|dir| dir.join("settings.json"))
 }
@@ -350,36 +385,57 @@ fn spawn_cursor_watcher(app_handle: tauri::AppHandle) {
                 None => continue,
             };
 
-            // Calculate the panel's physical bounds on screen
             let scale = monitor.scale_factor();
             let panel_phys_w = (234.0 * scale) as i32;
-            let panel_phys_h = (monitor.size().height as f64 * 0.6) as i32;
+            let panel_phys_h = window.outer_size().unwrap_or_default().height as i32;
+            
             let panel_x = monitor.position().x;
             let panel_y = monitor.position().y + ((monitor.size().height as i32 - panel_phys_h) / 2);
 
-            // Trigger zone: within 10 physical pixels of the left edge, and
-            // within the panel's vertical band
             let trigger_margin = (10.0 * scale) as i32;
             let in_trigger_zone = cx >= panel_x
                 && cx <= panel_x + trigger_margin
                 && cy >= panel_y
                 && cy <= panel_y + panel_phys_h;
 
-            // Hysteresis bound: adding a buffer of ~50 physical pixels to the hide bounds
-            let buffer = (50.0 * scale) as i32;
-            let in_hysteresis_bounds = cx >= panel_x - buffer
-                && cx <= panel_x + panel_phys_w + buffer
-                && cy >= panel_y - buffer
-                && cy <= panel_y + panel_phys_h + buffer;
+            let is_settings_open = app_handle.try_state::<UIState>()
+                .map(|s| s.settings_open.load(Ordering::Relaxed))
+                .unwrap_or(false);
+
+            // Hysteresis bound: adding a buffer to the hide bounds
+            let mut buffer_x = (120.0 * scale) as i32;
+            let mut buffer_y = (120.0 * scale) as i32;
+            
+            if is_settings_open {
+                buffer_x += (250.0 * scale) as i32;
+                buffer_y += (200.0 * scale) as i32;
+            }
+
+            let in_hysteresis_bounds = cx >= panel_x - buffer_x
+                && cx <= panel_x + panel_phys_w + buffer_x
+                && cy >= panel_y - buffer_y
+                && cy <= panel_y + panel_phys_h + buffer_y;
 
             let currently_visible = is_visible.load(Ordering::Relaxed);
 
             if !currently_visible && in_trigger_zone {
-                // Show the window
-                let _ = window.emit("panel-shown", ());
+                let _ = window.set_position(tauri::PhysicalPosition::new(panel_x - panel_phys_w, panel_y));
                 let _ = window.show();
                 let _ = window.set_focus();
                 is_visible.store(true, Ordering::Relaxed);
+                
+                let w = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    let steps = 15;
+                    for i in 1..=steps {
+                        let t = i as f64 / steps as f64;
+                        let ease = 1.0 - (1.0 - t).powi(3); // cubic ease out
+                        let new_x = (panel_x - panel_phys_w) as f64 + (panel_phys_w as f64 * ease);
+                        let _ = w.set_position(tauri::PhysicalPosition::new(new_x as i32, panel_y));
+                        tokio::time::sleep(std::time::Duration::from_millis(15)).await;
+                    }
+                    let _ = w.set_position(tauri::PhysicalPosition::new(panel_x, panel_y));
+                });
             } else if currently_visible && !in_trigger_zone && !in_hysteresis_bounds {
                 // Cursor left both the trigger zone and the hysteresis buffer — hide
                 let _ = window.hide();
@@ -415,9 +471,30 @@ pub fn run() {
                                 // Toggle on
                                 state.is_pinned.store(true, std::sync::atomic::Ordering::Relaxed);
                                 if let Some(window) = app.get_webview_window("main") {
-                                    let _ = window.emit("panel-shown", ());
-                                    let _ = window.show();
-                                    let _ = window.set_focus();
+                                    if let Ok(Some(monitor)) = window.primary_monitor() {
+                                        let scale = monitor.scale_factor();
+                                        let panel_phys_w = (234.0 * scale) as i32;
+                                        let panel_phys_h = window.outer_size().unwrap_or_default().height as i32;
+                                        let panel_x = monitor.position().x;
+                                        let panel_y = monitor.position().y + ((monitor.size().height as i32 - panel_phys_h) / 2);
+
+                                        let _ = window.set_position(tauri::PhysicalPosition::new(panel_x - panel_phys_w, panel_y));
+                                        let _ = window.show();
+                                        let _ = window.set_focus();
+
+                                        let w = window.clone();
+                                        tauri::async_runtime::spawn(async move {
+                                            let steps = 15;
+                                            for i in 1..=steps {
+                                                let t = i as f64 / steps as f64;
+                                                let ease = 1.0 - (1.0 - t).powi(3); // cubic ease out
+                                                let new_x = (panel_x - panel_phys_w) as f64 + (panel_phys_w as f64 * ease);
+                                                let _ = w.set_position(tauri::PhysicalPosition::new(new_x as i32, panel_y));
+                                                tokio::time::sleep(std::time::Duration::from_millis(15)).await;
+                                            }
+                                            let _ = w.set_position(tauri::PhysicalPosition::new(panel_x, panel_y));
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -425,7 +502,7 @@ pub fn run() {
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![greet, switch_tab, close_tab, load_settings, save_settings])
+        .invoke_handler(tauri::generate_handler![greet, switch_tab, close_tab, load_settings, save_settings, report_settings_open, update_window_height])
         .setup(|app| {
             let app_state: AppState = Arc::new(Mutex::new(HashMap::new()));
             app.manage(app_state.clone());
@@ -433,6 +510,10 @@ pub fn run() {
             // Manage the hotkey state for toggling
             app.manage(HotkeyState {
                 is_pinned: std::sync::atomic::AtomicBool::new(false),
+            });
+
+            app.manage(UIState {
+                settings_open: std::sync::atomic::AtomicBool::new(false),
             });
 
             spawn_websocket_server(app.handle().clone(), app_state);

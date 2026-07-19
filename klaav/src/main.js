@@ -37,7 +37,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   // Settings toggle
   // ---------------------------------------------------------------
   settingsTrigger.addEventListener("click", () => {
-    settingsPanel.classList.toggle("open");
+    const isOpen = settingsPanel.classList.toggle("open");
+    invoke("report_settings_open", { isOpen }).catch(e => console.error(e));
   });
 
   async function saveSettings() {
@@ -132,21 +133,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   // ---------------------------------------------------------------
   // tabs-updated listener
   // ---------------------------------------------------------------
-  listen("panel-shown", () => {
-    // Reset transform out of view instantly, then trigger transition
-    panelEl.style.transition = "none";
-    panelEl.style.transform = "translateX(-100%)";
-    panelEl.style.opacity = "0";
-    
-    // Force a reflow
-    void panelEl.offsetWidth;
-    
-    // Animate in
-    panelEl.style.transition = "transform 220ms cubic-bezier(0.16,1,0.3,1), opacity 220ms ease-out";
-    panelEl.style.transform = "translateX(0)";
-    panelEl.style.opacity = "1";
-  });
-
   listen("tabs-updated", (event) => {
     const loader = document.getElementById("loading-state");
     if (loader && loader.style.display !== "none") {
@@ -186,6 +172,8 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     renderPinnedRow();
     renderTabs(true);
+    
+    invoke("update_window_height", { tabCount: tabsData.length }).catch(e => console.error(e));
   });
 
   // ---------------------------------------------------------------
@@ -280,6 +268,7 @@ window.addEventListener("DOMContentLoaded", async () => {
           }
           saveSettings();
           renderPinnedRow();
+          invoke("update_window_height", { tabCount: tabsData.length }).catch(e => console.error(e));
         });
 
         chipEl.appendChild(dotEl);
