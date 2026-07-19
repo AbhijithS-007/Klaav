@@ -1,4 +1,4 @@
-const SHARED_SECRET = "my-secret-token";
+import { SHARED_SECRET } from './secret.js';
 const WS_URL = "ws://127.0.0.1:8765";
 const STORAGE_KEY = "tabCreatedTimestamps";
 

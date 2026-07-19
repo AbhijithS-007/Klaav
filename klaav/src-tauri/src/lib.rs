@@ -7,7 +7,7 @@ use futures_util::{StreamExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 
-const SHARED_SECRET: &str = "my-secret-token";
+const SHARED_SECRET_RAW: &str = include_str!("../../../.secret");
 
 /* 
  * WebSocket Message Protocol
@@ -181,7 +181,7 @@ fn spawn_websocket_server(app_handle: tauri::AppHandle, state: AppState) {
                 if let Some(Ok(msg)) = read.next().await {
                     if let Ok(text) = msg.to_text() {
                         if let Ok(ClientMessage::Hello { browser, token, tabs }) = serde_json::from_str(text) {
-                            if token != SHARED_SECRET {
+                            if token != SHARED_SECRET_RAW.trim() {
                                 eprintln!("Invalid token from browser: {}", browser);
                                 return;
                             }
