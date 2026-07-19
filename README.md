@@ -10,6 +10,7 @@ Instead of hunting across multiple browser windows for the tab you need, Klaav l
 - **Chronological Timeline:** Tabs are sorted by when you opened them (oldest first) so your tab history naturally forms a timeline, regardless of which browser it lives in.
 - **Carousel UI:** A beautiful vertical carousel interface that scales and fades tabs based on their distance from the center, inspired by native mobile picker wheels.
 - **Zero-Friction Access:** The UI stays completely hidden until you move your mouse to the far-left edge of your screen, at which point it instantly appears.
+- **Global Hotkey:** Press `Alt + Q` from anywhere to pop open Klaav and "pin" it to your screen. It won't disappear when you move your mouse away until you select a tab or press `Alt + Q` again.
 - **Keyboard & Mouse Support:** Scroll through your tabs smoothly using your mouse wheel, or use `ArrowUp` / `ArrowDown` and `Enter` to navigate without lifting your hands from the keyboard.
 
 ## How it works
