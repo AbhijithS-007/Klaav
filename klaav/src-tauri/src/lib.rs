@@ -433,42 +433,140 @@ pub fn run() {
                     use tauri::Manager;
                     use tauri_plugin_global_shortcut::ShortcutState;
                     if event.state == ShortcutState::Pressed {
-                        if let Some(state) = app.try_state::<HotkeyState>() {
-                            let currently_pinned = state.is_pinned.load(std::sync::atomic::Ordering::Relaxed);
-                            if currently_pinned {
-                                // Toggle off
-                                state.is_pinned.store(false, std::sync::atomic::Ordering::Relaxed);
-                                if let Some(window) = app.get_webview_window("main") {
-                                    let _ = window.hide();
-                                }
-                            } else {
-                                // Toggle on
-                                state.is_pinned.store(true, std::sync::atomic::Ordering::Relaxed);
-                                if let Some(window) = app.get_webview_window("main") {
-                                    if let Ok(Some(monitor)) = window.primary_monitor() {
-                                        let scale = monitor.scale_factor();
-                                        let panel_phys_w = (234.0 * scale) as i32;
-                                        let panel_phys_h = (monitor.size().height as f64 * 0.6) as i32;
-                                        let panel_x = monitor.position().x;
-                                        let panel_y = monitor.position().y + ((monitor.size().height as i32 - panel_phys_h) / 2);
-
-                                        let _ = window.set_position(tauri::PhysicalPosition::new(panel_x - panel_phys_w, panel_y));
-                                        let _ = window.show();
-                                        let _ = window.set_focus();
-
-                                        let w = window.clone();
-                                        tauri::async_runtime::spawn(async move {
-                                            let steps = 15;
-                                            for i in 1..=steps {
-                                                let t = i as f64 / steps as f64;
-                                                let ease = 1.0 - (1.0 - t).powi(3); // cubic ease out
-                                                let new_x = (panel_x - panel_phys_w) as f64 + (panel_phys_w as f64 * ease);
-                                                let _ = w.set_position(tauri::PhysicalPosition::new(new_x as i32, panel_y));
-                                                tokio::time::sleep(std::time::Duration::from_millis(15)).await;
-                                            }
-                                            let _ = w.set_position(tauri::PhysicalPosition::new(panel_x, panel_y));
-                                        });
+                        let shortcut_str = format!("{:?}", _shortcut);
+                        
+                        // Handle Alt+Q (Toggle Panel)
+                        if shortcut_str.contains("Alt") && shortcut_str.contains("Q") {
+                            if let Some(state) = app.try_state::<HotkeyState>() {
+                                let currently_pinned = state.is_pinned.load(std::sync::atomic::Ordering::Relaxed);
+                                if currently_pinned {
+                                    state.is_pinned.store(false, std::sync::atomic::Ordering::Relaxed);
+                                    if let Some(window) = app.get_webview_window("main") {
+                                        let _ = window.hide();
                                     }
+                                } else {
+                                    state.is_pinned.store(true, std::sync::atomic::Ordering::Relaxed);
+                                    if let Some(window) = app.get_webview_window("main") {
+                                        if let Ok(Some(monitor)) = window.primary_monitor() {
+                                            let scale = monitor.scale_factor();
+                                            let panel_phys_w = (234.0 * scale) as i32;
+                                            let panel_phys_h = (monitor.size().height as f64 * 0.6) as i32;
+                                            let panel_x = monitor.position().x;
+                                            let panel_y = monitor.position().y + ((monitor.size().height as i32 - panel_phys_h) / 2);
+
+                                            let _ = window.set_position(tauri::PhysicalPosition::new(panel_x - panel_phys_w, panel_y));
+                                            let _ = window.show();
+                                            let _ = window.set_focus();
+
+                                            let w = window.clone();
+                                            tauri::async_runtime::spawn(async move {
+                                                let steps = 15;
+                                                for i in 1..=steps {
+                                                    let t = i as f64 / steps as f64;
+                                                    let ease = 1.0 - (1.0 - t).powi(3); // cubic ease out
+                                                    let new_x = (panel_x - panel_phys_w) as f64 + (panel_phys_w as f64 * ease);
+                                                    let _ = w.set_position(tauri::PhysicalPosition::new(new_x as i32, panel_y));
+                                                    tokio::time::sleep(std::time::Duration::from_millis(15)).await;
+                                                }
+                                                let _ = w.set_position(tauri::PhysicalPosition::new(panel_x, panel_y));
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        } 
+                        // Handle Alt+1 through Alt+9 (Pinned Tab switching)
+                        else {
+                            for i in 1..=9 {
+                                if shortcut_str.contains("Alt") && shortcut_str.contains(&i.to_string()) {
+                                    let idx = i - 1;
+                                    let app_handle = app.clone();
+                                    
+                                    tauri::async_runtime::spawn(async move {
+                                        let settings_path = match get_settings_path(&app_handle) {
+                                            Some(p) => p,
+                                            None => return,
+                                        };
+                                        
+                                        if let Ok(contents) = std::fs::read_to_string(&settings_path) {
+                                            if let Ok(settings) = serde_json::from_str::<Settings>(&contents) {
+                                                let urls = settings.pinned_urls;
+                                                if idx < urls.len() {
+                                                    let target_url = &urls[idx];
+                                                    
+                                                    // Look up live tab
+                                                        let app_state = match app_handle.try_state::<AppState>() {
+                                                            Some(s) => s,
+                                                            None => return,
+                                                        };
+                                                        
+                                                        let mut target_browser = None;
+                                                        let mut target_tab = None;
+                                                        
+                                                        {
+                                                            let state_lock = app_state.lock().await;
+                                                            'search: for (browser_name, browser_state) in state_lock.iter() {
+                                                                for tab in &browser_state.tabs {
+                                                                    if &tab.url == target_url {
+                                                                        target_browser = Some((browser_name.clone(), browser_state.tx.clone()));
+                                                                        target_tab = Some(tab.clone());
+                                                                        break 'search;
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        
+                                                        if let (Some((browser, tx)), Some(tab)) = (target_browser, target_tab) {
+                                                            // Found the tab! Send activate command
+                                                            #[cfg(windows)]
+                                                            {
+                                                                use std::process::Command;
+                                                                use std::os::windows::process::CommandExt;
+                                                                const CREATE_NO_WINDOW: u32 = 0x08000000;
+                                                                
+                                                                let exe_name = match browser.as_str() {
+                                                                    "chrome" => "chrome.exe",
+                                                                    "edge" => "msedge.exe",
+                                                                    "brave" => "brave.exe",
+                                                                    _ => "chrome.exe",
+                                                                };
+                                                                
+                                                                let _ = Command::new("powershell")
+                                                                    .args(&[
+                                                                        "-NoProfile",
+                                                                        "-Command",
+                                                                        &format!("
+                                                                            Add-Type -TypeDefinition @'
+                                                                            using System;
+                                                                            using System.Runtime.InteropServices;
+                                                                            public class Win32 {{
+                                                                                [DllImport(\"user32.dll\")]
+                                                                                public static extern bool AllowSetForegroundWindow(int dwProcessId);
+                                                                            }}
+                                                                            '@;
+                                                                            $process = Get-Process -Name '{}' -ErrorAction SilentlyContinue | Select-Object -First 1;
+                                                                            if ($process) {{
+                                                                                [Win32]::AllowSetForegroundWindow($process.Id)
+                                                                            }}
+                                                                        ", exe_name.trim_end_matches(".exe"))
+                                                                    ])
+                                                                    .creation_flags(CREATE_NO_WINDOW)
+                                                                    .output();
+                                                            }
+                                                            
+                                                            let msg = serde_json::json!({
+                                                                "type": "activate-tab",
+                                                                "tabId": tab.tab_id,
+                                                                "windowId": tab.window_id
+                                                            });
+                                                            
+                                                            let _ = tx.send(msg.to_string()).await;
+                                                        }
+                                                    }
+                                            }
+                                        }
+                                    });
+                                    break;
                                 }
                             }
                         }
@@ -497,6 +595,12 @@ pub fn run() {
             
             let alt_q = "Alt+Q".parse::<Shortcut>().unwrap();
             let _ = app.global_shortcut().register(alt_q);
+
+            for i in 1..=9 {
+                if let Ok(shortcut) = format!("Alt+{}", i).parse::<Shortcut>() {
+                    let _ = app.global_shortcut().register(shortcut);
+                }
+            }
 
             let show_i = MenuItem::with_id(app, "show", "Show Klaav", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
