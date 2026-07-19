@@ -475,6 +475,13 @@ pub fn run() {
                                 }
                             }
                         } 
+                        // Handle Ctrl+Alt+Up and Ctrl+Alt+Down
+                        else if shortcut_str.contains("Ctrl") && shortcut_str.contains("Alt") && shortcut_str.contains("Up") {
+                            let _ = app.emit("hotkey-nav-prev", ());
+                        }
+                        else if shortcut_str.contains("Ctrl") && shortcut_str.contains("Alt") && shortcut_str.contains("Down") {
+                            let _ = app.emit("hotkey-nav-next", ());
+                        }
                         // Handle Alt+1 through Alt+9 (Pinned Tab switching)
                         else {
                             for i in 1..=9 {
@@ -600,6 +607,13 @@ pub fn run() {
                 if let Ok(shortcut) = format!("Alt+{}", i).parse::<Shortcut>() {
                     let _ = app.global_shortcut().register(shortcut);
                 }
+            }
+
+            if let Ok(shortcut) = "Ctrl+Alt+Up".parse::<Shortcut>() {
+                let _ = app.global_shortcut().register(shortcut);
+            }
+            if let Ok(shortcut) = "Ctrl+Alt+Down".parse::<Shortcut>() {
+                let _ = app.global_shortcut().register(shortcut);
             }
 
             let show_i = MenuItem::with_id(app, "show", "Show Klaav", true, None::<&str>)?;

@@ -177,6 +177,30 @@ window.addEventListener("DOMContentLoaded", async () => {
     refreshTabList();
   });
 
+  listen("hotkey-nav-prev", () => {
+    if (tabsData.length === 0) return;
+    selectedIndex = selectedIndex - 1;
+    if (selectedIndex < 0) {
+      selectedIndex = tabsData.length - 1;
+    }
+    updateSelectionState(selectedIndex);
+    renderTabs();
+    const tab = tabsData[selectedIndex];
+    invoke("switch_tab", { tabId: tab.tab_id, browser: tab.browser });
+  });
+
+  listen("hotkey-nav-next", () => {
+    if (tabsData.length === 0) return;
+    selectedIndex = selectedIndex + 1;
+    if (selectedIndex >= tabsData.length) {
+      selectedIndex = 0;
+    }
+    updateSelectionState(selectedIndex);
+    renderTabs();
+    const tab = tabsData[selectedIndex];
+    invoke("switch_tab", { tabId: tab.tab_id, browser: tab.browser });
+  });
+
   // ---------------------------------------------------------------
   // renderPinnedRow
   // ---------------------------------------------------------------
