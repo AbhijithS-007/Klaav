@@ -28,6 +28,13 @@
   --settings-panel-bg: rgba(30, 30, 35, 0.85);
   --settings-panel-border: rgba(255, 255, 255, 0.1);
   --settings-panel-text: white;
+  
+  --browser-chrome: #4285F4;
+  --browser-edge: #0FA0CE;
+  --browser-brave: #FB542B;
+  --browser-chromium: #7c7c7c;
+  --browser-opera: #FF1B2D;
+  --browser-vivaldi: #EF3939;
 }
 
 /* 1. Neumorphism */
@@ -341,6 +348,14 @@ html, body {
   cursor: pointer;
 }
 
+.tab-chip.chrome .pin-btn { color: var(--browser-chrome); }
+.tab-chip.edge .pin-btn { color: var(--browser-edge); }
+.tab-chip.brave .pin-btn { color: var(--browser-brave); }
+.tab-chip.chromium .pin-btn { color: var(--browser-chromium); }
+.tab-chip.opera .pin-btn { color: var(--browser-opera); }
+.tab-chip.vivaldi .pin-btn { color: var(--browser-vivaldi); }
+
+
 .tab-chip:hover .pin-btn,
 .tab-chip .pin-btn.pinned {
   display: block;
@@ -363,12 +378,12 @@ html, body {
   flex-shrink: 0;
 }
 
-.tab-dot.chrome { background: #4285F4; }
-.tab-dot.edge { background: #0078D7; }
-.tab-dot.brave { background: #FB542B; }
-.tab-dot.chromium { background: #7c7c7c; }
-.tab-dot.opera { background: #FF1B2D; }
-.tab-dot.vivaldi { background: #EF3939; }
+.tab-dot.chrome { background: var(--browser-chrome); }
+.tab-dot.edge { background: var(--browser-edge); }
+.tab-dot.brave { background: var(--browser-brave); }
+.tab-dot.chromium { background: var(--browser-chromium); }
+.tab-dot.opera { background: var(--browser-opera); }
+.tab-dot.vivaldi { background: var(--browser-vivaldi); }
 
 .tab-title {
   color: var(--text-color);

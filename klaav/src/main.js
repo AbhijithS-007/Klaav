@@ -245,7 +245,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       tabsData.forEach((tabData, i) => {
         const { browser, tab_id, window_id, title, url } = tabData;
         const chipEl = document.createElement("div");
-        chipEl.className = "tab-chip";
+        chipEl.className = `tab-chip ${browser}`;
 
         const dotEl = document.createElement("div");
         dotEl.className = `tab-dot ${browser}`;
