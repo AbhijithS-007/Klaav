@@ -103,11 +103,17 @@ impl Default for Settings {
 
 pub struct UIState {
     pub settings_open: std::sync::atomic::AtomicBool,
+    pub selected_index: std::sync::atomic::AtomicIsize,
 }
 
 #[tauri::command]
 fn report_settings_open(state: tauri::State<UIState>, is_open: bool) {
     state.settings_open.store(is_open, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[tauri::command]
+fn sync_selection(state: tauri::State<UIState>, index: isize) {
+    state.selected_index.store(index, std::sync::atomic::Ordering::Relaxed);
 }
 
 fn get_settings_path(app_handle: &tauri::AppHandle) -> Option<PathBuf> {
@@ -435,8 +441,6 @@ pub fn run() {
                     if event.state == ShortcutState::Pressed {
                         use std::str::FromStr;
                         let alt_q = tauri_plugin_global_shortcut::Shortcut::from_str("Alt+Q").unwrap();
-                        let nav_prev = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Alt+ArrowUp").unwrap();
-                        let nav_next = tauri_plugin_global_shortcut::Shortcut::from_str("Ctrl+Alt+ArrowDown").unwrap();
                         
                         // Handle Alt+Q (Toggle Panel)
                         if _shortcut.id() == alt_q.id() {
@@ -478,115 +482,11 @@ pub fn run() {
                                 }
                             }
                         } 
-                        // Handle Ctrl+Alt+Up and Ctrl+Alt+Down
-                        else if _shortcut.id() == nav_prev.id() {
-                            let _ = app.emit("hotkey-nav-prev", ());
-                        }
-                        else if _shortcut.id() == nav_next.id() {
-                            let _ = app.emit("hotkey-nav-next", ());
-                        }
-                        // Handle Alt+1 through Alt+9 (Pinned Tab switching)
-                        else {
-                            for i in 1..=9 {
-                                if let Ok(s) = tauri_plugin_global_shortcut::Shortcut::from_str(&format!("Alt+Digit{}", i)) {
-                                    if _shortcut.id() == s.id() {
-                                    let idx = i - 1;
-                                    let app_handle = app.clone();
-                                    
-                                    tauri::async_runtime::spawn(async move {
-                                        let settings_path = match get_settings_path(&app_handle) {
-                                            Some(p) => p,
-                                            None => return,
-                                        };
-                                        
-                                        if let Ok(contents) = std::fs::read_to_string(&settings_path) {
-                                            if let Ok(settings) = serde_json::from_str::<Settings>(&contents) {
-                                                let urls = settings.pinned_urls;
-                                                if idx < urls.len() {
-                                                    let target_url = &urls[idx];
-                                                    
-                                                    // Look up live tab
-                                                        let app_state = match app_handle.try_state::<AppState>() {
-                                                            Some(s) => s,
-                                                            None => return,
-                                                        };
-                                                        
-                                                        let mut target_browser = None;
-                                                        let mut target_tab = None;
-                                                        
-                                                        {
-                                                            let state_lock = app_state.lock().await;
-                                                            'search: for (browser_name, browser_state) in state_lock.iter() {
-                                                                for tab in &browser_state.tabs {
-                                                                    if &tab.url == target_url {
-                                                                        target_browser = Some((browser_name.clone(), browser_state.tx.clone()));
-                                                                        target_tab = Some(tab.clone());
-                                                                        break 'search;
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                        
-                                                        if let (Some((browser, tx)), Some(tab)) = (target_browser, target_tab) {
-                                                            // Found the tab! Send activate command
-                                                            #[cfg(windows)]
-                                                            {
-                                                                use std::process::Command;
-                                                                use std::os::windows::process::CommandExt;
-                                                                const CREATE_NO_WINDOW: u32 = 0x08000000;
-                                                                
-                                                                let exe_name = match browser.as_str() {
-                                                                    "chrome" => "chrome.exe",
-                                                                    "edge" => "msedge.exe",
-                                                                    "brave" => "brave.exe",
-                                                                    _ => "chrome.exe",
-                                                                };
-                                                                
-                                                                let _ = Command::new("powershell")
-                                                                    .args(&[
-                                                                        "-NoProfile",
-                                                                        "-Command",
-                                                                        &format!("
-                                                                            Add-Type -TypeDefinition @'
-                                                                            using System;
-                                                                            using System.Runtime.InteropServices;
-                                                                            public class Win32 {{
-                                                                                [DllImport(\"user32.dll\")]
-                                                                                public static extern bool AllowSetForegroundWindow(int dwProcessId);
-                                                                            }}
-                                                                            '@;
-                                                                            $process = Get-Process -Name '{}' -ErrorAction SilentlyContinue | Select-Object -First 1;
-                                                                            if ($process) {{
-                                                                                [Win32]::AllowSetForegroundWindow($process.Id)
-                                                                            }}
-                                                                        ", exe_name.trim_end_matches(".exe"))
-                                                                    ])
-                                                                    .creation_flags(CREATE_NO_WINDOW)
-                                                                    .output();
-                                                            }
-                                                            
-                                                            let msg = serde_json::json!({
-                                                                "type": "activate-tab",
-                                                                "tabId": tab.tab_id,
-                                                                "windowId": tab.window_id
-                                                            });
-                                                            
-                                                            let _ = tx.send(msg.to_string()).await;
-                                                        }
-                                                    }
-                                            }
-                                        }
-                                    });
-                                    break;
-                                    }
-                                }
-                            }
-                        }
                     }
                 })
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![greet, switch_tab, close_tab, load_settings, save_settings, report_settings_open])
+        .invoke_handler(tauri::generate_handler![report_settings_open, sync_selection, load_settings, save_settings, switch_tab, close_tab])
         .setup(|app| {
             let app_state: AppState = Arc::new(Mutex::new(HashMap::new()));
             app.manage(app_state.clone());
@@ -598,6 +498,7 @@ pub fn run() {
 
             app.manage(UIState {
                 settings_open: std::sync::atomic::AtomicBool::new(false),
+                selected_index: std::sync::atomic::AtomicIsize::new(-1),
             });
 
             spawn_websocket_server(app.handle().clone(), app_state);
@@ -618,13 +519,6 @@ pub fn run() {
             };
 
             parse_and_register(app, "Alt+Q");
-            
-            for i in 1..=9 {
-                parse_and_register(app, &format!("Alt+Digit{}", i));
-            }
-
-            parse_and_register(app, "Ctrl+Alt+ArrowUp");
-            parse_and_register(app, "Ctrl+Alt+ArrowDown");
 
             let show_i = MenuItem::with_id(app, "show", "Show Klaav", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;

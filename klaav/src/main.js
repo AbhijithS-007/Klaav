@@ -115,6 +115,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       selectedIndex = index;
       selectedTabId = tabsData[index].tab_id;
       selectedBrowser = tabsData[index].browser;
+      invoke("sync_selection", { index }).catch(console.error);
     }
   }
 
@@ -177,28 +178,14 @@ window.addEventListener("DOMContentLoaded", async () => {
     refreshTabList();
   });
 
-  listen("hotkey-nav-prev", () => {
-    if (tabsData.length === 0) return;
-    selectedIndex = selectedIndex - 1;
-    if (selectedIndex < 0) {
-      selectedIndex = tabsData.length - 1;
+  listen("selection-changed", (event) => {
+    const newIdx = event.payload;
+    if (tabsData.length > 0 && newIdx >= 0 && newIdx < tabsData.length) {
+      selectedIndex = newIdx;
+      selectedTabId = tabsData[newIdx].tab_id;
+      selectedBrowser = tabsData[newIdx].browser;
+      renderTabs();
     }
-    updateSelectionState(selectedIndex);
-    renderTabs();
-    const tab = tabsData[selectedIndex];
-    invoke("switch_tab", { tabId: tab.tab_id, browser: tab.browser });
-  });
-
-  listen("hotkey-nav-next", () => {
-    if (tabsData.length === 0) return;
-    selectedIndex = selectedIndex + 1;
-    if (selectedIndex >= tabsData.length) {
-      selectedIndex = 0;
-    }
-    updateSelectionState(selectedIndex);
-    renderTabs();
-    const tab = tabsData[selectedIndex];
-    invoke("switch_tab", { tabId: tab.tab_id, browser: tab.browser });
   });
 
   // ---------------------------------------------------------------
