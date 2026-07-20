@@ -488,7 +488,7 @@ pub fn run() {
                         // Handle Alt+1 through Alt+9 (Pinned Tab switching)
                         else {
                             for i in 1..=9 {
-                                if let Ok(s) = tauri_plugin_global_shortcut::Shortcut::from_str(&format!("Alt+{}", i)) {
+                                if let Ok(s) = tauri_plugin_global_shortcut::Shortcut::from_str(&format!("Alt+Digit{}", i)) {
                                     if _shortcut.id() == s.id() {
                                     let idx = i - 1;
                                     let app_handle = app.clone();
@@ -620,7 +620,7 @@ pub fn run() {
             parse_and_register(app, "Alt+Q");
             
             for i in 1..=9 {
-                parse_and_register(app, &format!("Alt+{}", i));
+                parse_and_register(app, &format!("Alt+Digit{}", i));
             }
 
             parse_and_register(app, "Ctrl+Alt+ArrowUp");
